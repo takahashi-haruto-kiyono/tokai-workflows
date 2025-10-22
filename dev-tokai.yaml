@@ -9,7 +9,16 @@ main:
   params: [event]
   steps:
     # ============================================
-    # Step 1: イベントデータからファイル情報を抽出
+    # Step 1: デバッグ - event の中身を全部ログ出力
+    # ============================================
+    - debug_event_structure:
+        call: sys.log
+        args:
+          data: '${"DEBUG EVENT STRUCTURE: " + json.encode_to_string(event)}'
+          severity: INFO
+
+    # ============================================
+    # Step 2: イベントデータからファイル情報を抽出
     # ============================================
     - extract_file_info:
         assign:
@@ -17,32 +26,47 @@ main:
           - file_name: ${event.data.name}
           - file_path: '${"gs://" + bucket + "/" + file_name}'
           - project_id: ${sys.get_env("GOOGLE_CLOUD_PROJECT_ID")}
-          - dataset_l0: "cdp_l0"
+          - dataset_l0: "dev_cdp_config"
           - dataset_l1: "cdp_l1"
 
+    - debug_file_info:
+        call: sys.log
+        args:
+          data: '${"DEBUG: bucket=" + bucket + ", file_name=" + file_name + ", file_path=" + file_path}'
+          severity: INFO
+
     # ============================================
-    # Step 2: inbox配下のファイルかチェック
-    # パス例: raw/D002_customer_master/inbox/D002_20250121.csv
+    # Step 3: inbox配下のファイルかチェック
+    # パス例: raw/l0_D100_test/inbox/D100_test_20251021.csv
     # ============================================
     - validate_inbox_path:
         switch:
-          - condition: ${not text.match_regex(file_name, "/inbox/")}
-            return:
-              status: "SKIPPED"
-              reason: "File is not in inbox directory"
-              file_path: ${file_path}
+          - condition: ${not text.match_regex(file_name, ".*\\/inbox\\/.*")}
+            steps:
+              - log_skip:
+                  call: sys.log
+                  args:
+                    data: '${"SKIPPED: File is not in inbox directory: " + file_name}'
+                    severity: INFO
+              - return_skip:
+                  return:
+                    status: "SKIPPED"
+                    reason: "File is not in inbox directory"
+                    file_path: ${file_path}
 
     # ============================================
     # Step 3: ファイル名からテーブルIDを抽出
-    # パス例: raw/D002_customer_master/inbox/D002_20250121.csv
-    #         → file_parts[1] = "D002_customer_master"
-    #         → table_id = "D002" (アンダースコアで分割して最初)
+    # パス例: raw/l0_D100_test/inbox/D100_test_20251021.csv
+    #         → folder_name = "l0_D100_test"
+    #         → folder_name_no_prefix = "D100_test" (l0_ を削除)
+    #         → table_id = "D100" (アンダースコアで分割して最初)
     # ============================================
     - extract_table_id:
         assign:
           - file_parts: ${text.split(file_name, "/")}
           - folder_name: ${file_parts[1]}
-          - table_id_from_path: ${text.split(folder_name, "_")[0]}
+          - folder_name_no_prefix: ${text.replace_all(folder_name, "l0_", "")}
+          - table_id_from_path: ${text.split(folder_name_no_prefix, "_")[0]}
           - base_file_name: ${file_parts[len(file_parts)-1]}
           - table_id_from_file: ${text.split(base_file_name, "_")[0]}
 
@@ -78,7 +102,7 @@ main:
                 allow_quoted_newlines,
                 allow_jagged_rows,
                 max_bad_records
-              FROM `cdp_config.table_mapping`
+              FROM `dev_cdp_config.table_mapping`
               WHERE table_id = @table_id
             parameterMode: "NAMED"
             queryParameters:
@@ -112,7 +136,56 @@ main:
           - max_bad_records: ${int(config[8].v)}
 
     # ============================================
-    # Step 7: L0への読み込み
+    # Step 6.5: アーカイブパスを事前に計算 (ロード前)
+    # ============================================
+    - prepare_archive_path:
+        assign:
+          - timestamp: ${time.format(sys.now())}
+          - timestamp_clean: '${text.replace_all(text.replace_all(text.replace_all(timestamp, "-", ""), ":", ""), "T", "")}'
+          - timestamp_formatted: '${text.substring(timestamp_clean, 0, 14)}'
+          - archive_path: '${text.replace_all(file_name, "/inbox/", "/archive/")}'
+          - archive_path_with_ts: '${text.replace_all(archive_path, ".csv", "_" + timestamp_formatted + ".csv")}'
+
+    # ============================================
+    # Step 7: ファイルをアーカイブにコピー (ロード前に実行)
+    # エラーハンドリング付き
+    # ============================================
+    - debug_copy_params:
+        call: sys.log
+        args:
+          data: '${"DEBUG COPY: sourceBucket=" + bucket + ", sourceObject=" + file_name + ", destinationBucket=" + bucket + ", destinationObject=" + archive_path_with_ts}'
+          severity: INFO
+
+    - copy_to_archive_before_load:
+        try:
+          call: http.post
+          args:
+            url: '${"https://storage.googleapis.com/storage/v1/b/" + bucket + "/o/" + text.url_encode(file_name) + "/copyTo/b/" + bucket + "/o/" + text.url_encode(archive_path_with_ts)}'
+            auth:
+              type: OAuth2
+          result: copy_result
+        except:
+          as: e
+          steps:
+            - log_copy_error:
+                call: sys.log
+                args:
+                  data: '${"ERROR: Failed to copy file - " + json.encode_to_string(e)}'
+                  severity: ERROR
+            - return_copy_failed:
+                return:
+                  status: "FAILED"
+                  reason: "File copy failed (file may not exist)"
+                  error: ${e}
+
+    - log_archive_success:
+        call: sys.log
+        args:
+          data: '${"File archived to: " + archive_path_with_ts}'
+          severity: INFO
+
+    # ============================================
+    # Step 9: L0への読み込み
     # ============================================
     - load_to_l0:
         call: googleapis.bigquery.v2.jobs.insert
@@ -121,7 +194,7 @@ main:
           body:
             configuration:
               load:
-                sourceUris: [${file_path}]
+                sourceUris: ['${file_path}']
                 destinationTable:
                   projectId: ${project_id}
                   datasetId: ${dataset_l0}
@@ -133,21 +206,18 @@ main:
                 allowQuotedNewlines: ${allow_quoted_newlines}
                 allowJaggedRows: ${allow_jagged_rows}
                 maxBadRecords: ${max_bad_records}
-                autodetect: false
+                autodetect: true
                 timePartitioning:
                   type: "DAY"
-                  field: "_loaded_at"
-                schema:
-                  fields: []
-              jobTimeoutMs: 3600000  # 1時間タイムアウト
+              jobTimeoutMs: 3600000
         result: load_job
 
     # ============================================
-    # Step 8: L0ロードジョブの完了待機
+    # Step 10: L0ロードジョブの完了待機
     # ============================================
     - init_wait_loop:
         assign:
-          - max_iterations: 720  # 720回 × 5秒 = 1時間
+          - max_iterations: 720
           - iteration: 0
 
     - wait_for_l0_load:
@@ -190,48 +260,24 @@ main:
         args:
           data: '${"L0 load completed successfully for " + table_name + ", job_id: " + load_job.jobReference.jobId}'
           severity: INFO
-        next: archive_file
 
     # ============================================
-    # NOTE: Dataform実行はPhase 2で追加予定
-    # 中西さんのDataform実装完了後に有効化
-    # ============================================
-
-    # ============================================
-    # Step 9: 成功時のファイルアーカイブ
-    # 変換例: raw/D002_customer_master/inbox/D002_20250121.csv
-    #       → raw/D002_customer_master/archive/D002_20250121_20250121143022.csv
-    # ============================================
-    - archive_file:
-        assign:
-          - timestamp: ${time.format(sys.now())}
-          - timestamp_formatted: '${text.replace_all(text.replace_all(timestamp, ":", ""), "-", "")}'
-          - archive_path: '${text.replace_all(file_name, "/inbox/", "/archive/")}'
-          - archive_path_with_ts: '${text.replace_all(archive_path, ".csv", "_" + text.substring(timestamp_formatted, 0, 14) + ".csv")}'
-
-    - log_archive_start:
-        call: sys.log
-        args:
-          data: '${"Archiving file to: " + archive_path_with_ts}'
-          severity: INFO
-
-    - copy_to_archive:
-        call: googleapis.storage.v1.objects.copy
-        args:
-          sourceBucket: ${bucket}
-          sourceObject: ${file_name}
-          destinationBucket: ${bucket}
-          destinationObject: ${archive_path_with_ts}
-        result: copy_result
-
-    # ============================================
-    # Step 10: 元ファイルの削除
+    # Step 11: 元ファイルの削除
     # ============================================
     - delete_original_file:
-        call: googleapis.storage.v1.objects.delete
-        args:
-          bucket: ${bucket}
-          object: ${file_name}
+        try:
+          call: googleapis.storage.v1.objects.delete
+          args:
+            bucket: ${bucket}
+            object: ${file_name}
+        except:
+          as: e
+          steps:
+            - log_delete_error:
+                call: sys.log
+                args:
+                  data: '${"Failed to delete original file (may already be deleted): " + file_name + ", error: " + json.encode_to_string(e)}'
+                  severity: WARNING
 
     - log_delete_success:
         call: sys.log
@@ -240,7 +286,7 @@ main:
           severity: INFO
 
     # ============================================
-    # Step 11: 正常終了
+    # Step 12: 正常終了
     # ============================================
     - return_success:
         return:
