@@ -266,10 +266,11 @@ main:
     # ============================================
     - delete_original_file:
         try:
-          call: googleapis.storage.v1.objects.delete
+          call: http.delete
           args:
-            bucket: ${bucket}
-            object: ${file_name}
+            url: '${"https://storage.googleapis.com/storage/v1/b/" + bucket + "/o/" + text.url_encode(file_name)}'
+            auth:
+              type: OAuth2
         except:
           as: e
           steps:
