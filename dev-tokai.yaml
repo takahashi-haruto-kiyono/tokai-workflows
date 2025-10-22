@@ -9,16 +9,7 @@ main:
   params: [event]
   steps:
     # ============================================
-    # Step 1: デバッグ - event の中身を全部ログ出力
-    # ============================================
-    - debug_event_structure:
-        call: sys.log
-        args:
-          data: '${"DEBUG EVENT STRUCTURE: " + json.encode_to_string(event)}'
-          severity: INFO
-
-    # ============================================
-    # Step 2: イベントデータからファイル情報を抽出
+    # Step 1: イベントデータからファイル情報を抽出
     # ============================================
     - extract_file_info:
         assign:
@@ -29,14 +20,8 @@ main:
           - dataset_l0: "dev_cdp_config"
           - dataset_l1: "cdp_l1"
 
-    - debug_file_info:
-        call: sys.log
-        args:
-          data: '${"DEBUG: bucket=" + bucket + ", file_name=" + file_name + ", file_path=" + file_path}'
-          severity: INFO
-
     # ============================================
-    # Step 3: inbox配下のファイルかチェック
+    # Step 2: inbox配下のファイルかチェック
     # パス例: raw/l0_D100_test/inbox/D100_test_20251021.csv
     # ============================================
     - validate_inbox_path:
@@ -150,12 +135,6 @@ main:
     # Step 7: ファイルをアーカイブにコピー (ロード前に実行)
     # エラーハンドリング付き
     # ============================================
-    - debug_copy_params:
-        call: sys.log
-        args:
-          data: '${"DEBUG COPY: sourceBucket=" + bucket + ", sourceObject=" + file_name + ", destinationBucket=" + bucket + ", destinationObject=" + archive_path_with_ts}'
-          severity: INFO
-
     - copy_to_archive_before_load:
         try:
           call: http.post
