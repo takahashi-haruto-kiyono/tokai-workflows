@@ -61,8 +61,22 @@ main:
     - validate_table_id:
         switch:
           - condition: ${table_id_from_path != table_id_from_file}
-            raise:
-              message: '${"Table ID mismatch: path=" + table_id_from_path + " file=" + table_id_from_file}'
+            steps:
+              - log_table_id_mismatch:
+                  call: sys.log
+                  args:
+                    json:
+                      error_type: "TABLE_ID_MISMATCH"
+                      error_message: "Table ID mismatch"
+                      file_path: ${file_path}
+                      table_id_from_path: ${table_id_from_path}
+                      table_id_from_file: ${table_id_from_file}
+                      folder_name: ${folder_name}
+                      base_file_name: ${base_file_name}
+                    severity: ERROR
+              - raise_table_id_error:
+                  raise:
+                    message: '${"Table ID mismatch: path=" + table_id_from_path + " file=" + table_id_from_file}'
 
     - get_table_config:
         assign:
@@ -81,7 +95,6 @@ main:
                 table_id,
                 table_name,
                 load_type,
-                write_disposition,
                 skip_leading_rows,
                 field_delimiter,
                 allow_quoted_newlines,
@@ -105,20 +118,32 @@ main:
     - validate_config:
         switch:
           - condition: ${len(query_result.rows) == 0}
-            raise:
-              message: '${"No configuration found for table_id: " + table_id}'
+            steps:
+              - log_config_not_found:
+                  call: sys.log
+                  args:
+                    json:
+                      error_type: "CONFIG_NOT_FOUND"
+                      error_message: "No configuration found in table_mapping"
+                      table_id: ${table_id}
+                      file_path: ${file_path}
+                      dataset: "dev_cdp_config"
+                      table: "table_mapping"
+                    severity: ERROR
+              - raise_config_error:
+                  raise:
+                    message: '${"No configuration found for table_id: " + table_id}'
 
     - parse_config:
         assign:
           - config: ${query_result.rows[0].f}
           - table_name: ${config[1].v}
           - load_type: ${config[2].v}
-          - write_disposition: ${config[3].v}
-          - skip_leading_rows: ${int(config[4].v)}
-          - field_delimiter: ${config[5].v}
-          - allow_quoted_newlines: ${config[6].v == "true"}
-          - allow_jagged_rows: ${config[7].v == "true"}
-          - max_bad_records: ${int(config[8].v)}
+          - skip_leading_rows: ${int(config[3].v)}
+          - field_delimiter: ${config[4].v}
+          - allow_quoted_newlines: ${config[5].v == "true"}
+          - allow_jagged_rows: ${config[6].v == "true"}
+          - max_bad_records: ${int(config[7].v)}
 
     # ============================================
     # Step 6.5: アーカイブパスを事前に計算 (ロード前)
@@ -149,7 +174,13 @@ main:
             - log_copy_error:
                 call: sys.log
                 args:
-                  data: '${"ERROR: Failed to copy file - " + json.encode_to_string(e)}'
+                  json:
+                    error_type: "FILE_COPY_FAILED"
+                    error_message: "Failed to copy file to archive"
+                    source_file: ${file_path}
+                    destination_file: '${"gs://" + bucket + "/" + archive_path_with_ts}'
+                    bucket: ${bucket}
+                    error_details: ${e}
                   severity: ERROR
             - return_copy_failed:
                 return:
@@ -178,7 +209,7 @@ main:
                   projectId: ${project_id}
                   datasetId: ${dataset_l0}
                   tableId: ${table_name}
-                writeDisposition: ${write_disposition}
+                writeDisposition: "WRITE_APPEND"
                 sourceFormat: "CSV"
                 skipLeadingRows: ${skip_leading_rows}
                 fieldDelimiter: ${field_delimiter}
@@ -212,8 +243,21 @@ main:
           - condition: ${job_status.status.state == "DONE"}
             next: verify_l0_load_success
           - condition: ${iteration >= max_iterations}
-            raise:
-              message: "Load job timeout after 1 hour"
+            steps:
+              - log_timeout:
+                  call: sys.log
+                  args:
+                    json:
+                      error_type: "LOAD_JOB_TIMEOUT"
+                      error_message: "Load job timeout after 1 hour"
+                      job_id: ${load_job.jobReference.jobId}
+                      table_name: ${table_name}
+                      file_path: ${file_path}
+                      max_iterations: ${max_iterations}
+                    severity: ERROR
+              - raise_timeout:
+                  raise:
+                    message: "Load job timeout after 1 hour"
           - condition: ${job_status.status.state == "RUNNING" or job_status.status.state == "PENDING"}
             next: increment_iteration
 
@@ -231,8 +275,21 @@ main:
     - verify_l0_load_success:
         switch:
           - condition: ${"errorResult" in job_status.status}
-            raise:
-              message: '${"L0 load failed: " + job_status.status.errorResult.message}'
+            steps:
+              - log_load_failure:
+                  call: sys.log
+                  args:
+                    json:
+                      error_type: "BIGQUERY_LOAD_FAILED"
+                      error_message: ${job_status.status.errorResult.message}
+                      job_id: ${load_job.jobReference.jobId}
+                      table_name: ${table_name}
+                      file_path: ${file_path}
+                      error_result: ${job_status.status.errorResult}
+                    severity: ERROR
+              - raise_load_error:
+                  raise:
+                    message: '${"L0 load failed: " + job_status.status.errorResult.message}'
 
     - log_l0_success:
         call: sys.log
@@ -256,7 +313,11 @@ main:
             - log_delete_error:
                 call: sys.log
                 args:
-                  data: '${"Failed to delete original file (may already be deleted): " + file_name + ", error: " + json.encode_to_string(e)}'
+                  json:
+                    error_type: "FILE_DELETE_FAILED"
+                    error_message: "Failed to delete original file"
+                    file_path: ${file_path}
+                    error_details: ${e}
                   severity: WARNING
 
     - log_delete_success:
