@@ -185,7 +185,7 @@ main:
                 allowQuotedNewlines: ${allow_quoted_newlines}
                 allowJaggedRows: ${allow_jagged_rows}
                 maxBadRecords: ${max_bad_records}
-                autodetect: true
+                autodetect: false
                 timePartitioning:
                   type: "DAY"
               jobTimeoutMs: 3600000
