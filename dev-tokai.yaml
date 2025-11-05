@@ -1,9 +1,8 @@
-# CDP Data Pipeline - Phase 1 Version
+# CDP Data Pipeline - Phase 2 Version
 # 担当: 高橋
-# 目的: GCS inbox → L0 → archive（Dataform実行なし）
+# 目的: GCS inbox → L0 → archive → Dataform L1変換
 #
-# Phase 1: L0ロードとアーカイブのみ実装
-# Phase 2: 中西さんのDataform実装後に追加
+# Phase 2: Dataform L1変換を追加
 
 main:
   params: [event]
@@ -17,8 +16,9 @@ main:
           - file_name: ${event.data.name}
           - file_path: '${"gs://" + bucket + "/" + file_name}'
           - project_id: ${sys.get_env("GOOGLE_CLOUD_PROJECT_ID")}
-          - dataset_l0: "dev_cdp_config"
-          - dataset_l1: "cdp_l1"
+          - dataset_l0: "l0_cdp_raw"
+          - dataform_repository: '${"projects/" + project_id + "/locations/asia-northeast1/repositories/data-preparation"}'
+          - dataform_workspace: "prd"
 
     # ============================================
     # Step 2: inbox配下のファイルかチェック
@@ -41,17 +41,15 @@ main:
 
     # ============================================
     # Step 3: ファイル名からテーブルIDを抽出
-    # パス例: raw/l0_D100_test/inbox/D100_test_20251021.csv
-    #         → folder_name = "l0_D100_test"
-    #         → folder_name_no_prefix = "D100_test" (l0_ を削除)
-    #         → table_id = "D100" (アンダースコアで分割して最初)
+    # パス例: raw/D005_DM_response_flag/inbox/D005_20251026.csv
+    #         → folder_name = "D005_DM_response_flag"
+    #         → table_id = "D005" (アンダースコアで分割して最初)
     # ============================================
     - extract_table_id:
         assign:
           - file_parts: ${text.split(file_name, "/")}
           - folder_name: ${file_parts[1]}
-          - folder_name_no_prefix: ${text.replace_all(folder_name, "l0_", "")}
-          - table_id_from_path: ${text.split(folder_name_no_prefix, "_")[0]}
+          - table_id_from_path: ${text.split(folder_name, "_")[0]}
           - base_file_name: ${file_parts[len(file_parts)-1]}
           - table_id_from_file: ${text.split(base_file_name, "_")[0]}
 
@@ -327,16 +325,126 @@ main:
           severity: INFO
 
     # ============================================
-    # Step 12: 正常終了
+    # Step 12: Dataform Compilation Result作成
+    # ============================================
+    - create_compilation_result:
+        call: http.post
+        args:
+          url: '${"https://dataform.googleapis.com/v1beta1/" + dataform_repository + "/compilationResults"}'
+          auth:
+            type: OAuth2
+          body:
+            workspace: '${dataform_repository + "/workspaces/" + dataform_workspace}'
+        result: compilation_result
+
+    - log_compilation_success:
+        call: sys.log
+        args:
+          data: "Dataform compilation result created"
+          severity: INFO
+
+    # ============================================
+    # Step 13: Dataform Workflow Invocation実行
+    # ============================================
+    - create_workflow_invocation:
+        call: http.post
+        args:
+          url: '${"https://dataform.googleapis.com/v1beta1/" + dataform_repository + "/workflowInvocations"}'
+          auth:
+            type: OAuth2
+          body:
+            compilationResult: ${compilation_result.body.name}
+            invocationConfig:
+              includedTags:
+                - '${"l1_" + table_id}'
+              transitiveDependenciesIncluded: true
+        result: workflow_invocation
+
+    - log_workflow_invocation_created:
+        call: sys.log
+        args:
+          data: '${"Dataform workflow invocation created for table_id: " + table_id}'
+          severity: INFO
+
+    # ============================================
+    # Step 14: Dataform完了待機
+    # ============================================
+    - wait_for_dataform_completion:
+        try:
+          call: waitForDataformCompletion
+          args:
+            workflow_name: ${workflow_invocation.body.name}
+          result: dataform_status
+        except:
+          as: e
+          steps:
+            - log_dataform_error:
+                call: sys.log
+                args:
+                  json:
+                    error_type: "DATAFORM_EXECUTION_FAILED"
+                    error_message: "Dataform execution failed"
+                    table_id: ${table_id}
+                    error_details: ${e}
+                  severity: ERROR
+            - raise_dataform_error:
+                raise: ${e}
+
+    - log_dataform_success:
+        call: sys.log
+        args:
+          data: '${"Dataform L1 transformation completed successfully for table_id: " + table_id}'
+          severity: INFO
+
+    # ============================================
+    # Step 15: 正常終了
     # ============================================
     - return_success:
         return:
           status: "SUCCESS"
-          phase: "Phase 1 - L0 load only"
+          phase: "Phase 2 - L0 load and L1 transformation"
           table_id: ${table_id}
           table_name: ${table_name}
           load_type: ${load_type}
           file_path: ${file_path}
           archive_path: '${"gs://" + bucket + "/" + archive_path_with_ts}'
           l0_job_id: ${load_job.jobReference.jobId}
-          note: "Dataform L1 transformation will be added in Phase 2"
+          dataform_invocation_name: ${workflow_invocation.body.name}
+          dataform_status: ${dataform_status}
+
+# ============================================
+# サブワークフロー: Dataform完了待機
+# ============================================
+waitForDataformCompletion:
+  params:
+    - workflow_name
+  steps:
+    - check_dataform_job:
+        call: http.get
+        args:
+          url: '${"https://dataform.googleapis.com/v1beta1/" + workflow_name}'
+          auth:
+            type: OAuth2
+        result: job_status
+
+    - check_if_done:
+        switch:
+          - condition: ${job_status.body.state == "SUCCEEDED"}
+            return: ${job_status.body.state}
+          - condition: ${job_status.body.state == "FAILED"}
+            steps:
+              - log_failure:
+                  call: sys.log
+                  args:
+                    json:
+                      error_type: "DATAFORM_FAILED"
+                      job_status: ${job_status.body}
+                    severity: ERROR
+              - raise_failure:
+                  raise: ${job_status.body.compilationResult}
+
+    - wait_before_retry:
+        call: sys.sleep
+        args:
+          seconds: 20
+        next: check_dataform_job
