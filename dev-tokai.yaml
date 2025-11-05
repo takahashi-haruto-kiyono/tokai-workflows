@@ -141,7 +141,7 @@ main:
           - field_delimiter: ${config[4].v}
           - allow_quoted_newlines: ${config[5].v == "true"}
           - allow_jagged_rows: ${config[6].v == "true"}
-          - max_bad_records: 10
+          - max_bad_records: ${int(config[7].v)}
 
     # ============================================
     # Step 6.5: アーカイブパスを事前に計算 (ロード前)
@@ -357,7 +357,6 @@ main:
             invocationConfig:
               includedTags:
                 - '${"l1_" + table_id}'
-              transitiveDependenciesIncluded: true
         result: workflow_invocation
 
     - log_workflow_invocation_created:
