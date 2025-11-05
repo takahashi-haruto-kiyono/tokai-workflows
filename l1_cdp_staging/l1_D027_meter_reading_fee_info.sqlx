@@ -1,0 +1,24 @@
+config {
+    type: "table",
+    schema: "l1_cdp_staging",
+    description: "Tanpopo検針票・CVS発行手数料情報",
+    columns: {
+        code: "販売店コード",
+        flg: "受託買収フラグ",
+        store_name: "販売店名",
+        created_date: "処理年月日"
+    },
+    tags: ["l1", "D027", "l1_D027"],
+    assertions: {
+        nonNull: ["customer_code"],
+        uniqueKey: ["customer_code"],
+    },
+}
+
+SELECT 
+    RTRIM(customer_code) AS customer_code --修正前提
+    ,meter_slip_issuance_fee
+    ,cvs_issuance_fee
+FROM ${ref('l0_D027_meter_reading_fee_info')}
+WHERE 0=0   
+    AND _PARTITIONTIME = (SELECT MAX(_PARTITIONTIME) FROM ${ref('l0_D027_meter_reading_fee_info')})

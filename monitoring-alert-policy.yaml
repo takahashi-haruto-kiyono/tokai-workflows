@@ -1,0 +1,46 @@
+# Cloud Monitoring Alert Policy for CDP Data Pipeline
+# このファイルをgcloud CLIで適用してアラートポリシーを作成します
+
+displayName: "CDP Data Pipeline - Error Alert"
+documentation:
+  content: |
+    CDP Data Pipelineでエラーが発生しました。
+
+    エラータイプ:
+    - TABLE_ID_MISMATCH: ファイル名とフォルダ名のテーブルIDが不一致
+    - CONFIG_NOT_FOUND: table_mappingに設定が見つからない
+    - BIGQUERY_LOAD_FAILED: BigQueryへのロード失敗
+    - LOAD_JOB_TIMEOUT: ロードジョブがタイムアウト
+    - DATAFORM_EXECUTION_FAILED: Dataform実行失敗
+    - FILE_COPY_FAILED: アーカイブコピー失敗
+
+    Cloud Logsで詳細を確認してください。
+  mimeType: text/markdown
+
+conditions:
+  - displayName: "Workflow Error Detected"
+    conditionMatchedLog:
+      filter: |
+        resource.type="workflows.googleapis.com/Workflow"
+        resource.labels.workflow_id="dev-tokai"
+        severity=ERROR
+        (
+          jsonPayload.error_type="TABLE_ID_MISMATCH" OR
+          jsonPayload.error_type="CONFIG_NOT_FOUND" OR
+          jsonPayload.error_type="BIGQUERY_LOAD_FAILED" OR
+          jsonPayload.error_type="LOAD_JOB_TIMEOUT" OR
+          jsonPayload.error_type="DATAFORM_EXECUTION_FAILED" OR
+          jsonPayload.error_type="DATAFORM_FAILED"
+        )
+
+alertStrategy:
+  autoClose: 604800s  # 7日後に自動クローズ
+  notificationRateLimit:
+    period: 300s  # 5分間に1回まで通知（スパム防止）
+
+combiner: OR
+
+enabled: true
+
+# notificationChannelsはCLIで指定するため、ここでは空
+notificationChannels: []

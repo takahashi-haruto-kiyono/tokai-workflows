@@ -1,0 +1,66 @@
+config {
+    type: "incremental",
+    schema: "l1_cdp_staging",
+    description: "受付情報",
+    columns: {
+        customer_code: "需用家コード"
+        , reception_datetime: "受付日時"
+        , receptionist: "受付者"
+        , inquiry_type: "問合せ区分"
+        , detail_type: "詳細区分"
+        , work_type: "作業区分"
+        , response_date: "対応日"
+        , visit_response: "訪問対応"
+        , reception_type: "受付種別"
+        , gas_stop_info_acquisition_date: "ガス中止・情報入手日"
+        , gas_stop_notification_fax_availability: "ガス中止・通知FAX有無"
+        , gas_stop_notification_arrival_date: "ガス中止・通知到着日"
+        , gas_stop_planned_switch_date: "ガス中止・切替予定日"
+        , gas_stop_switch_destination: "ガス中止・中止切替先"
+        , gas_stop_switch_destination_free_input: "ガス中止・中止切替先（自由入力）"
+        , gas_stop_reason: "ガス中止・中止理由"
+        , gas_stop_processing_scheduled_date: "ガス中止・処理予定日"
+        , gas_stop_confirmation_date: "ガス中止・確定日"
+        , gas_stop_response_result: "ガス中止・対応結果"
+        , reception_no: "受付NO"
+        , update_date: "更新日"
+    },
+    tags: ["l1", "D019", "l1_D019"],
+    uniqueKey: ["reception_no"],
+    bigquery: {
+        partitionBy: "DATE_TRUNC(reception_datetime, MONTH)"
+    },
+    assertions: {
+        nonNull: ['customer_code','reception_no', 'reception_datetime'],
+        uniqueKey: ['customer_code','reception_no'],
+    },
+}
+
+SELECT
+    RTRIM(customer_code) AS customer_code
+    ,SAFE.PARSE_DATETIME("%Y/%m/%d %H:%M",RTRIM(reception_datetime)) AS reception_datetime
+    ,RTRIM(receptionist) AS receptionist
+    ,RTRIM(inquiry_type) AS inquiry_type
+    ,RTRIM(detail_type) AS detail_type
+    ,RTRIM(work_type) AS work_type
+    ,SAFE.PARSE_DATE("%Y/%m/%d",RTRIM(response_date)) AS response_date
+    ,RTRIM(visit_response) AS visit_response
+    ,RTRIM(reception_type) AS reception_type
+    ,SAFE.PARSE_DATE("%Y/%m/%d",RTRIM(gas_stop_info_acquisition_date)) AS gas_stop_info_acquisition_date
+    ,RTRIM(gas_stop_notification_fax_availability) AS gas_stop_notification_fax_availability
+    ,SAFE.PARSE_DATE("%Y/%m/%d",RTRIM(gas_stop_notification_arrival_date)) AS gas_stop_notification_arrival_date
+    ,SAFE.PARSE_DATE("%Y/%m/%d",RTRIM(gas_stop_planned_switch_date)) AS gas_stop_planned_switch_date
+    ,RTRIM(gas_stop_switch_destination) AS gas_stop_switch_destination
+    ,RTRIM(gas_stop_switch_destination_free_input) AS gas_stop_switch_destination_free_input
+    ,RTRIM(gas_stop_reason) AS gas_stop_reason
+    ,SAFE.PARSE_DATE("%Y/%m/%d",RTRIM(gas_stop_processing_scheduled_date)) AS gas_stop_processing_scheduled_date
+    ,SAFE.PARSE_DATE("%Y/%m/%d",RTRIM(gas_stop_confirmation_date)) AS gas_stop_confirmation_date
+    ,RTRIM(gas_stop_response_result) AS gas_stop_response_result
+    ,RTRIM(reception_no) AS reception_no
+    ,PARSE_DATETIME("%Y/%m/%d %H:%M:%S",RTRIM(update_date)) AS update_date
+FROM ${ref('l0_D019_reception_info')}
+WHERE 0=0
+    ${when(incremental(),
+    `AND _PARTITIONDATE = (SELECT MAX(_PARTITIONTIME) FROM ${ref('l0_D019_reception_info')})`
+    )}
+QUALIFY ROW_NUMBER()OVER(PARTITION BY reception_no ORDER BY _PARTITIONDATE DESC, update_date DESC)=1

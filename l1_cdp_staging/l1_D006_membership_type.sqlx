@@ -1,0 +1,24 @@
+config {
+    type: "incremental",
+    schema: "l1_cdp_staging",
+    description: "登録区分M",
+    columns: {
+        code: "登録区分コード",
+        name: "登録区分"
+    },
+    tags: ["l1", "D006", "l1_D006"],
+    uniqueKey: ["code"],
+    assertions: {
+        nonNull: ['code'],
+        uniqueKey: ['code'],
+    },
+}
+SELECT
+    RTRIM(code) AS code,
+    RTRIM(name) AS name
+FROM ${ref('l0_D006_membership_type')}
+WHERE 0=0
+    ${when(incremental(),
+    `AND _PARTITIONTIME = (SELECT MAX(_PARTITIONTIME) FROM ${ref('l0_D006_membership_type')})`
+    )}
+QUALIFY ROW_NUMBER()OVER(PARTITION BY code ORDER BY _PARTITIONDATE DESC)=1

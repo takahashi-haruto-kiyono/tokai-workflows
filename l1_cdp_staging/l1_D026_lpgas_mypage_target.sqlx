@@ -1,0 +1,17 @@
+config {
+    type: "table",
+    schema: "l1_cdp_staging",
+    description: "LPガスマイページ対象",
+    columns: {
+        customer_code: "需用家コード"
+    },
+    tags: ["l1", "D026", "l1_D026"],
+    assertions: {
+        nonNull: ["customer_code"],
+        uniqueKey: ["customer_code"],
+    },
+}
+
+SELECT DISTINCT
+    RTRIM(customer_code) AS customer_code
+FROM ${ref('l0_D026_lpgas_mypage_target')}

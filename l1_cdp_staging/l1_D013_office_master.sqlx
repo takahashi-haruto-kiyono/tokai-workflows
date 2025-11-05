@@ -1,0 +1,72 @@
+config {
+    type: "incremental",
+    schema: "l1_cdp_staging",
+    description: "事業所マスタV",
+    columns: {
+        company_1: "会社１"
+        , office_1: "事業所１"
+        , office_2: "事業所２"
+        , office_name: "事業所名"
+        , section_code_1: "課コード１"
+        , section_code_2: "課コード２"
+        , section_code_3: "課コード３"
+        , section_code_4: "課コード４"
+        , section_code_5: "課コード５"
+        , section_code_6: "課コード６"
+        , section_code_7: "課コード７"
+        , section_code_8: "課コード８"
+        , section_code_9: "課コード９"
+        , section_code_10: "課コード１０"
+        , section_code_11: "課コード１１"
+        , section_code_12: "課コード１２"
+        , section_code_13: "課コード１３"
+        , section_code_14: "課コード１４"
+        , section_code_15: "課コード１５"
+        , section_code_16: "課コード１６"
+        , section_code_17: "課コード１７"
+        , section_code_18: "課コード１８"
+        , section_code_19: "課コード１９"
+        , section_code_20: "課コード２０"
+        , update_date: "更新日付"
+        , unique_id_1: "ユニークＩＤ１"
+    },
+    tags: ["l1", "D013", "l1_D013"],
+    uniqueKey: ["company_1", "office_1", "office_2"],
+    assertions: {
+        nonNull: ["company_1", "office_1", "office_2"],
+        uniqueKey: ["company_1", "office_1", "office_2"],
+    },
+}
+SELECT DISTINCT
+    RTRIM(company_1) AS company_1
+    , RTRIM(office_1) AS office_1
+    , RTRIM(office_2) AS office_2
+    , RTRIM(office_name) AS office_name
+    , RTRIM(section_code_1) AS section_code_1
+    , RTRIM(section_code_2) AS section_code_2
+    , RTRIM(section_code_3) AS section_code_3
+    , RTRIM(section_code_4) AS section_code_4
+    , RTRIM(section_code_5) AS section_code_5
+    , RTRIM(section_code_6) AS section_code_6
+    , RTRIM(section_code_7) AS section_code_7
+    , RTRIM(section_code_8) AS section_code_8
+    , RTRIM(section_code_9) AS section_code_9
+    , RTRIM(section_code_10) AS section_code_10
+    , RTRIM(section_code_11) AS section_code_11
+    , RTRIM(section_code_12) AS section_code_12
+    , RTRIM(section_code_13) AS section_code_13
+    , RTRIM(section_code_14) AS section_code_14
+    , RTRIM(section_code_15) AS section_code_15
+    , RTRIM(section_code_16) AS section_code_16
+    , RTRIM(section_code_17) AS section_code_17
+    , RTRIM(section_code_18) AS section_code_18
+    , RTRIM(section_code_19) AS section_code_19
+    , RTRIM(section_code_20) AS section_code_20
+    , PARSE_DATE("%Y/%m/%d",RTRIM(update_date)) AS update_date
+    , RTRIM(unique_id_1) AS unique_id_1
+FROM ${ref('l0_D013_office_master')}
+WHERE 0=0
+    ${when(incremental(),
+    `AND _PARTITIONTIME = (SELECT MAX(_PARTITIONTIME) FROM ${ref('l0_D013_office_master')})`
+    )}
+QUALIFY ROW_NUMBER()OVER(PARTITION BY company_1, office_1, office_2 ORDER BY _PARTITIONDATE DESC, update_date DESC)=1

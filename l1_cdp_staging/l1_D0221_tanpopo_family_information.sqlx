@@ -1,0 +1,77 @@
+config {
+    type: "incremental",
+    schema: "l1_cdp_staging",
+    description: "家族情報テーブル",
+    columns: {
+        customer_code: "需用家コード"
+        , interviewer_birth_year: "面談者生年月日（年）"
+        , interviewer_birth_month: "面談者生年月日（月）"
+        , interviewer_birth_day: "面談者生年月日（日）"
+        , interviewer_gender: "面談者性別"
+        , family_composition: "家族構成（人）"
+        , head_age_group: "世帯主年代"
+        , two_generation_house_flag: "二世帯住宅フラグ"
+        , pet: "ペット"
+        , decision_maker_home_flag_sun: "決定権者在宅情報フラグ（日）"
+        , decision_maker_home_flag_mon: "決定権者在宅情報フラグ（月）"
+        , decision_maker_home_flag_tue: "決定権者在宅情報フラグ（火）"
+        , decision_maker_home_flag_wed: "決定権者在宅情報フラグ（水）"
+        , decision_maker_home_flag_thu: "決定権者在宅情報フラグ（木）"
+        , decision_maker_home_flag_fri: "決定権者在宅情報フラグ（金）"
+        , decision_maker_home_flag_sat: "決定権者在宅情報フラグ（土）"
+        , decision_maker_home_time_from: "決定権者在宅時間FROM（時）"
+        , decision_maker_home_time_to: "決定権者在宅時間TO（時）"
+        , interviewer_home_flag_sun: "面談者等在宅情報フラグ（日）"
+        , interviewer_home_flag_mon: "面談者等在宅情報フラグ（月）"
+        , interviewer_home_flag_tue: "面談者等在宅情報フラグ（火）"
+        , interviewer_home_flag_wed: "面談者等在宅情報フラグ（水）"
+        , interviewer_home_flag_thu: "面談者等在宅情報フラグ（木）"
+        , interviewer_home_flag_fri: "面談者等在宅情報フラグ（金）"
+        , interviewer_home_flag_sat: "面談者等在宅情報フラグ（土）"
+        , interviewer_home_time_from: "面談者等在宅時間FROM（時）"
+        , interviewer_home_time_to: "面談者等在宅時間TO（時）"
+        , family_info_update_date: "家族情報更新日"
+    },
+    tags: ["l1", "D0221", "l1_D0221"],
+    uniqueKey: ["customer_code"],
+    assertions: {
+        nonNull: ["customer_code"],
+        uniqueKey: ["customer_code"],
+    },
+}
+
+SELECT
+    RTRIM(customer_code) AS customer_code
+    ,RTRIM(interviewer_birth_year) AS interviewer_birth_year
+    ,RTRIM(interviewer_birth_month) AS interviewer_birth_month
+    ,RTRIM(interviewer_birth_day) AS interviewer_birth_day
+    ,RTRIM(interviewer_gender) AS interviewer_gender
+    ,SAFE_CAST(RTRIM(family_composition) as INT64) AS family_composition
+    ,RTRIM(head_age_group) AS head_age_group
+    ,RTRIM(two_generation_house_flag) AS two_generation_house_flag
+    ,RTRIM(pet) AS pet
+    ,RTRIM(decision_maker_home_flag_sun) AS decision_maker_home_flag_sun
+    ,RTRIM(decision_maker_home_flag_mon) AS decision_maker_home_flag_mon
+    ,RTRIM(decision_maker_home_flag_tue) AS decision_maker_home_flag_tue
+    ,RTRIM(decision_maker_home_flag_wed) AS decision_maker_home_flag_wed
+    ,RTRIM(decision_maker_home_flag_thu) AS decision_maker_home_flag_thu
+    ,RTRIM(decision_maker_home_flag_fri) AS decision_maker_home_flag_fri
+    ,RTRIM(decision_maker_home_flag_sat) AS decision_maker_home_flag_sat
+    ,RTRIM(decision_maker_home_time_from) AS decision_maker_home_time_from
+    ,RTRIM(decision_maker_home_time_to) AS decision_maker_home_time_to
+    ,RTRIM(interviewer_home_flag_sun) AS interviewer_home_flag_sun
+    ,RTRIM(interviewer_home_flag_mon) AS interviewer_home_flag_mon
+    ,RTRIM(interviewer_home_flag_tue) AS interviewer_home_flag_tue
+    ,RTRIM(interviewer_home_flag_wed) AS interviewer_home_flag_wed
+    ,RTRIM(interviewer_home_flag_thu) AS interviewer_home_flag_thu
+    ,RTRIM(interviewer_home_flag_fri) AS interviewer_home_flag_fri
+    ,RTRIM(interviewer_home_flag_sat) AS interviewer_home_flag_sat
+    ,RTRIM(interviewer_home_time_from) AS interviewer_home_time_from
+    ,RTRIM(interviewer_home_time_to) AS interviewer_home_time_to
+    ,IF(family_info_update_date="",NULL, PARSE_DATETIME("%Y/%m/%d %H:%M:%S",RTRIM(family_info_update_date))) AS family_info_update_date
+FROM ${ref('l0_D0221_tanpopo_family_information')}
+WHERE 0=0
+    ${when(incremental(),
+    `AND _PARTITIONTIME = (SELECT MAX(_PARTITIONTIME) FROM ${ref('l0_D0221_tanpopo_family_information')})`
+    )}
+QUALIFY ROW_NUMBER()OVER(PARTITION BY customer_code ORDER BY family_info_update_date DESC)=1

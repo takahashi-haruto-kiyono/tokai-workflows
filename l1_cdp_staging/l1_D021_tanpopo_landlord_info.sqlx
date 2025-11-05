@@ -1,0 +1,35 @@
+config {
+    type: "table",
+    schema: "l1_cdp_staging",
+    description: "大家情報",
+    columns: {
+        customer_code: "需用家コード"
+        , property_customer_code: "物件需用家コード"
+        , meter_count: "メータ数"
+        , decision_authority: "決定権"
+        , deposit: "保証金"
+        , repair_cost: "修理代"
+        , update_date: "更新日"
+    },
+    tags: ["l1", "D021", "l1_D021"],
+    bigquery: {
+        partitionBy: 'DATETIME_TRUNC(update_date, MONTH)'
+    },
+    assertions: {
+        nonNull: ["property_customer_code"],
+        uniqueKey: ["property_customer_code"],
+    },
+}
+
+SELECT
+    RTRIM(customer_code) AS customer_code
+    ,RTRIM(property_customer_code) AS property_customer_code
+    ,RTRIM(meter_count) AS meter_count
+    ,RTRIM(decision_authority) AS decision_authority
+    ,RTRIM(deposit) AS deposit
+    ,RTRIM(repair_cost) AS repair_cost
+    ,PARSE_DATETIME("%Y/%m/%d %H:%M:%S",RTRIM(update_date)) AS update_date
+FROM ${ref('l0_D021_tanpopo_landlord_info')}
+WHERE 0=0
+    AND _PARTITIONTIME = (SELECT MAX(_PARTITIONTIME) FROM ${ref('l0_D021_tanpopo_landlord_info')})
+QUALIFY ROW_NUMBER()OVER(PARTITION BY property_customer_code, customer_code ORDER BY _PARTITIONDATE DESC, update_date DESC)=1

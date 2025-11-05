@@ -1,0 +1,38 @@
+config {
+    type: "table",
+    schema: "l1_cdp_staging",
+    description: "マイページ会員情報",
+    columns: {
+        customer_code: "需用家コード"
+        , promotional_email_allowed: "販促メール送信可否"
+        , meter_reading_issue_method: "検針票発行方法"
+        , email_address_exists: "メールアドレス有無"
+        , age_group: "年代"
+        , family_member_count: "ご家族の人数"
+        , initial_lpgas_mypage_registration_method: "初回LPガスマイページ登録方法"
+        , lpgas_mypage_account_exists: "LPガスマイページアカウント有無"
+        , line_login_setting_exists: "LINEログイン設定有無"
+        , promotional_line_allowed: "販促LINE送信可否"
+    },
+    tags: ["l1", "D024", "l1_D024"],
+    assertions: {
+        nonNull: ["customer_code"],
+        uniqueKey: ["customer_code"],
+    },
+}
+
+SELECT DISTINCT
+    RTRIM(customer_code) AS customer_code
+    ,PARSE_DATE("%Y/%m/%d",RTRIM(promotional_email_allowed)) AS promotional_email_allowed
+    ,RTRIM(meter_reading_issue_method) AS meter_reading_issue_method
+    ,RTRIM(email_address_exists) AS email_address_exists
+    ,RTRIM(age_group) AS age_group
+    ,RTRIM(family_member_count) AS family_member_count
+    ,RTRIM(initial_lpgas_mypage_registration_method) AS initial_lpgas_mypage_registration_method
+    ,RTRIM(lpgas_mypage_account_exists) AS lpgas_mypage_account_exists
+    ,RTRIM(line_login_setting_exists) AS line_login_setting_exists
+    ,RTRIM(promotional_line_allowed) AS promotional_line_allowed
+FROM ${ref('l0_D024_tanpopo_mypage_member_info')}
+WHERE 0=0
+    AND _PARTITIONTIME = (SELECT MAX(_PARTITIONTIME) FROM ${ref('l0_D024_tanpopo_mypage_member_info')})
+QUALIFY ROW_NUMBER() OVER(PARTITION BY customer_code ORDER BY _PARTITIONDATE DESC) = 1

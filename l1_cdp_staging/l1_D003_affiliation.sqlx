@@ -1,0 +1,24 @@
+config {
+    type: "incremental",
+    schema: "l1_cdp_staging",
+    description: "所属コード所属名紐付けマスタM",
+    columns: {
+        code: "所属コード",
+        name: "所属名"
+    },
+    tags: ["l1", "D003", "l1_D003"],
+    uniqueKey: ["code"],
+    assertions: {
+        nonNull: ['code'],
+        uniqueKey: ['code'],
+    },
+}
+SELECT
+    RTRIM(code) AS code,
+    RTRIM(name) AS name
+FROM ${ref('l0_D003_affiliation')}
+WHERE 0=0
+    ${when(incremental(),
+    `AND _PARTITIONTIME = (SELECT MAX(_PARTITIONTIME) FROM ${ref('l0_D003_affiliation')})`
+    )}
+QUALIFY ROW_NUMBER()OVER(PARTITION BY code ORDER BY _PARTITIONTIME DESC)=1

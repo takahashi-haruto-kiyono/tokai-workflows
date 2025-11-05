@@ -1,0 +1,18 @@
+SELECT 
+  SPLIT(table_name,"_")[SAFE_OFFSET(1)] as table_id,
+  table_name,
+  'full' as load_type,
+  'WRITE_APPEND' as write_disposition,
+  1 as skip_leading_rows,
+  ',' as file_delimiter,
+  'true' as allow_quoted_newlines,
+  'false' as allow_jagged_rows,
+  0 as max_bad_records,
+  "tokai-cdp-production-project-cdp-data/raw/" || table_name||"/inbox" as gcs_inbox_path,
+  "" as primary_key,
+  "" as update_column,
+  "daily" as frequency,
+  "" as description,
+  CURRENT_TIMESTAMP() as created_at,
+  CURRENT_TIMESTAMP() as updated_at,
+ FROM `tokai-cdp-production-project.l0_cdp_raw.INFORMATION_SCHEMA.TABLES`

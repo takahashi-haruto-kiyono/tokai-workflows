@@ -1,0 +1,24 @@
+config {
+    type: "incremental",
+    schema: "l1_cdp_staging",
+    description: "受託買収フラグM",
+    columns: {
+        code: "受託買収フラグコード",
+        name: "受託買収フラグ名"
+    },
+    tags: ["l1", "D012", "l1_D012"],
+    uniqueKey: ["code"],
+    assertions: {
+        nonNull: ['code'],
+        uniqueKey: ['code'],
+    },
+}
+SELECT DISTINCT
+    RTRIM(code) AS code,
+    RTRIM(name) AS name
+FROM ${ref('l0_D012_consignment_fee_flag')}
+WHERE 0=0
+    ${when(incremental(),
+    `AND _PARTITIONTIME = (SELECT MAX(_PARTITIONTIME) FROM ${ref('l0_D012_consignment_fee_flag')})`
+    )}
+QUALIFY ROW_NUMBER()OVER(PARTITION BY code ORDER BY _PARTITIONDATE DESC)=1

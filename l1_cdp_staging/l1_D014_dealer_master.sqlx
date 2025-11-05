@@ -1,0 +1,49 @@
+config {
+    type: "table",
+    schema: "l1_cdp_staging",
+    description: "特約店M",
+    columns: {
+        dealer_code: "販売店コード"
+        , transaction_type: "取引区分"
+        , registration_date: "登録日"
+        , abolition_date: "廃止日"
+        , affiliation: "所属"
+        , office_code: "事業所コード"
+        , dealer_name: "販売店名"
+        , update_date: "更新日"
+        , consignment_acquisition_flag: "受託買収フラグ"
+        , apron_flag: "エプロンフラグ"
+        , cc_flag: "ＣＣフラグ"
+        , representative_dealer_code: "代表販売店コード"
+        , integrated_customer_cooperation_flag: "統合顧客連携フラグ"
+        , update_datetime: "更新日時"
+        , consignment_acquisition_flag_update_date: "受託買収フラグ更新日"
+    },
+    tags: ["l1", "D014", "l1_D014"],
+    assertions: {
+        nonNull: ['dealer_code'],
+        uniqueKey: ['dealer_code'],
+    },
+}
+SELECT DISTINCT
+    RTRIM(dealer_code) AS dealer_code
+    ,RTRIM(transaction_type) AS transaction_type
+    ,PARSE_DATE("%Y/%m/%d",RTRIM(registration_date)) AS registration_date
+    ,PARSE_DATE("%Y/%m/%d",RTRIM(abolition_date)) AS abolition_date
+    ,RTRIM(affiliation) AS affiliation
+    ,RTRIM(office_code) AS office_code
+    ,RTRIM(dealer_name) AS dealer_name
+    ,PARSE_DATE("%Y/%m/%d",RTRIM(update_date)) AS update_date
+    ,RTRIM(consignment_acquisition_flag) AS consignment_acquisition_flag
+    ,RTRIM(apron_flag) AS apron_flag
+    ,RTRIM(cc_flag) AS cc_flag
+    ,RTRIM(representative_dealer_code) AS representative_dealer_code
+    ,RTRIM(integrated_customer_cooperation_flag) AS integrated_customer_cooperation_flag
+    ,PARSE_DATETIME("%Y/%m/%d %H:%M:%S",RTRIM(update_datetime)) AS update_datetime
+    ,PARSE_DATE("%Y/%m/%d",RTRIM(consignment_acquisition_flag_update_date)) AS consignment_acquisition_flag_update_date
+FROM ${ref('l0_D014_dealer_master')}
+WHERE 0=0
+    ${when(incremental(),
+    `AND _PARTITIONTIME = (SELECT MAX(_PARTITIONTIME) FROM ${ref('l0_D014_dealer_master')})`
+    )}
+QUALIFY ROW_NUMBER()OVER(PARTITION BY dealer_code ORDER BY _PARTITIONDATE DESC, update_datetime DESC)=1

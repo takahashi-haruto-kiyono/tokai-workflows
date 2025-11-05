@@ -1,0 +1,24 @@
+config {
+    type: "incremental",
+    schema: "l1_cdp_staging",
+    description: "取引区分コードM",
+    columns: {
+        code: "取引区分コード",
+        name: "取引区分名"
+    },
+    tags: ["l1", "D004", "l1_D004"],
+    uniqueKey: ["code"],
+    assertions: {
+        nonNull: ['code'],
+        uniqueKey: ['code'],
+    },
+}
+SELECT DISTINCT
+    RTRIM(code) AS code,
+    RTRIM(name) AS name
+FROM ${ref('l0_D004_transaction_type')}
+WHERE 0=0
+    ${when(incremental(),
+    `AND _PARTITIONTIME = (SELECT MAX(_PARTITIONTIME) FROM ${ref('l0_D004_transaction_type')})`
+    )}
+QUALIFY ROW_NUMBER()OVER(PARTITION BY code ORDER BY _PARTITIONDATE DESC)=1

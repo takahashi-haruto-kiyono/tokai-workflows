@@ -1,0 +1,63 @@
+config {
+    type: "incremental",
+    schema: "l1_cdp_staging",
+    description: "保安点検報告",
+    columns: {
+        customer_code: "需用家コード"
+        , ntt_flets: "NTTフレッツ"
+        , main_drinking_water: "主な飲料水"
+        , television: "テレビ"
+        , antenna_installation_years: "アンテナ設置年数"
+        , antenna_maintenance: "アンテナメンテナンス"
+        , interest_cooking_food: "興味フラグ（料理・食べ物）"
+        , interest_health_medical: "興味フラグ（健康・医療）"
+        , interest_childcare: "興味フラグ（育児・子育て）"
+        , interest_elderly_care: "興味フラグ（老後・介護）"
+        , interest_housing_real_estate: "興味フラグ（住まい・不動産）"
+        , interest_pet: "興味フラグ（ペット）"
+        , interest_entertainment: "興味フラグ（映画・演劇・音楽・芸術）"
+        , interest_sports: "興味フラグ（スポーツ）"
+        , interest_economy_politics: "興味フラグ（経済動向・景気・政治）"
+        , interest_investment: "興味フラグ（投資・貯蓄・資産運用）"
+        , interest_learning: "興味フラグ（学び）"
+        , interest_travel: "興味フラグ（旅行）"
+        , interest_automobile_bicycle: "興味フラグ（自動車・自転車）"
+        , interest_other: "興味フラグ（その他）"
+    },
+    tags: ["l1", "D0223", "l1_D0223"],
+    uniqueKey: ["customer_code"],
+    assertions: {
+        nonNull: ['customer_code'],
+        uniqueKey: ['customer_code'],
+    },
+}
+
+SELECT
+    RTRIM(customer_code) AS customer_code
+    ,RTRIM(ntt_flets) AS ntt_flets
+    ,RTRIM(main_drinking_water) AS main_drinking_water
+    ,RTRIM(television) AS television
+    ,RTRIM(antenna_installation_years) AS antenna_installation_years
+    ,RTRIM(antenna_maintenance) AS antenna_maintenance
+    ,RTRIM(interest_cooking_food) AS interest_cooking_food
+    ,RTRIM(interest_health_medical) AS interest_health_medical
+    ,RTRIM(interest_childcare) AS interest_childcare
+    ,RTRIM(interest_elderly_care) AS interest_elderly_care
+    ,RTRIM(interest_housing_real_estate) AS interest_housing_real_estate
+    ,RTRIM(interest_pet) AS interest_pet
+    ,RTRIM(interest_entertainment) AS interest_entertainment
+    ,RTRIM(interest_sports) AS interest_sports
+    ,RTRIM(interest_economy_politics) AS interest_economy_politics
+    ,RTRIM(interest_investment) AS interest_investment
+    ,RTRIM(interest_learning) AS interest_learning
+    ,RTRIM(interest_travel) AS interest_travel
+    ,RTRIM(interest_automobile_bicycle) AS interest_automobile_bicycle
+    ,RTRIM(interest_other) AS interest_other
+    ,RTRIM(tlc_waon_user) AS tlc_waon_user
+    ,SAFE.PARSE_DATETIME("%Y/%m/%d %H:%M:%S",RTRIM(update_date)) AS update_date
+FROM ${ref('l0_D0223_tanpopo_other_information')}
+WHERE 0=0
+    ${when(incremental(),
+    `AND _PARTITIONTIME = (SELECT MAX(_PARTITIONTIME) FROM ${ref('l0_D0223_tanpopo_other_information')})`
+    )}
+QUALIFY ROW_NUMBER()OVER(PARTITION BY customer_code ORDER BY _PARTITIONDATE DESC)=1

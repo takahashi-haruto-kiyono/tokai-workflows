@@ -1,0 +1,45 @@
+config {
+    type: "table",
+    schema: "l1_cdp_staging",
+    description: "Tanpopo需用家詳細情報ヘッダ部",
+    columns: {
+        customer_code: "需用家コード"
+        , aqua_info_availability: "アクア情報有無"
+        , tlc_member_flag: "TLC会員フラグ"
+        , support_flag: "サポテンフラグ"
+        , billing_amount: "請求金額"
+        , profit_evaluation: "営利評価"
+        , sales_employee_code: "営業担当者従業員コード"
+        , annual_consumption_kg: "年間消費Kg"
+        , purchase_rank: "購入ランク"
+        , purchase_count: "購入情報・回数"
+        , purchase_total_amount: "購入情報・累計額"
+        , gas_payment: "ガス支払"
+        , last_inspection_date: "前回定期点検・調査日"
+    },
+    tags: ["l1", "D016", "l1_D016"],
+    assertions: {
+        nonNull: ["customer_code"],
+        uniqueKey: ["customer_code"],
+    },
+}
+SELECT
+    RTRIM(customer_code) AS customer_code
+    , RTRIM(aqua_info_availability) AS aqua_info_availability
+    , RTRIM(tlc_member_flag) AS tlc_member_flag
+    , RTRIM(support_flag) AS support_flag
+    , RTRIM(billing_amount) AS billing_amount
+    , RTRIM(profit_evaluation) AS profit_evaluation
+    , RTRIM(sales_employee_code) AS sales_employee_code
+    , RTRIM(annual_consumption_kg) AS annual_consumption_kg
+    , RTRIM(purchase_rank) AS purchase_rank
+    , RTRIM(purchase_count) AS purchase_count
+    , RTRIM(purchase_total_amount) AS purchase_total_amount
+    , RTRIM(gas_payment) AS gas_payment
+    , SAFE.PARSE_DATE("%Y/%m/%d",RTRIM(last_inspection_date)) AS last_inspection_date
+FROM ${ref('l0_D016_customer_detail')}
+WHERE 0=0
+    ${when(incremental(),
+    `AND _PARTITIONTIME = (SELECT MAX(_PARTITIONTIME) FROM ${ref('l0_D007_classification_type')}))`
+    )}
+QUALIFY ROW_NUMBER()OVER(PARTITION BY customer_code ORDER BY _PARTITIONDATE DESC)=1

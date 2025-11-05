@@ -1,0 +1,122 @@
+config {
+    type: "incremental",
+    schema: "l1_cdp_staging",
+    description: "保安点検報告",
+    columns: {
+        customer_code: "需用家コード"
+        , target_property: "対象物件"
+        , house_structure: "家屋構造"
+        , house_floors: "家屋階数"
+        , completion_year: "竣工年"
+        , completion_month: "竣工月"
+        , house_size_tsubo: "家の広さ（坪数）"
+        , house_size_rooms: "家の広さ（部屋数）"
+        , house_condition_overall: "家屋状況（全体）"
+        , house_condition_roof: "家屋状況（屋根）"
+        , house_condition_exterior: "家屋状況（外壁）"
+        , roof: "屋根"
+        , roof_direction: "屋根の向き"
+        , roof_material: "屋根材"
+        , renovation_history_flag: "リフォーム履歴有無"
+        , renovation_history_year: "リフォーム履歴年"
+        , renovation_plan_flag: "リフォーム予定有無"
+        , renovation_plan_year: "リフォーム予定時期（年）"
+        , renovation_plan_month: "リフォーム予定時期（月）"
+        , rebuild_plan_flag: "建替予定有無"
+        , rebuild_plan_year: "建替予定時期（年）"
+        , rebuild_plan_month: "建替予定時期（月）"
+        , energy_usage: "使用エネルギー"
+        , gas_usage_m3_year: "ガス使用量（m3/年）"
+        , gas_usage_yen_year: "ガス使用量（円/年）"
+        , power_supply: "電力供給"
+        , solar_usage_flag: "太陽光利用フラグ"
+        , kitchen: "台所"
+        , hot_water_equipment_gas: "給湯設備フラグ（ガス給湯器）"
+        , hot_water_equipment_oil: "給湯設備フラグ（灯油ボイラー）"
+        , hot_water_equipment_eco_cute: "給湯設備フラグ（エコキュート）"
+        , hot_water_equipment_electric: "給湯設備フラグ（電気温水器）"
+        , hot_water_equipment_other: "給湯設備フラグ（その他）"
+        , heating_equipment: "暖房機"
+        , floor_heating: "床暖房"
+        , bathroom_heating: "浴室暖房"
+        , contract_ampere: "契約電流（A）"
+        , contract_company: "契約会社"
+        , power_meter_reading: "電力メーター指針（Kw）"
+        , power_meter_inspection_year_month: "電力メーター検満年月"
+        , power_meter_inspection_year: "電力メーター検満（年）"
+        , electricity_usage_target_month: "電気使用量対象月"
+        , monthly_electricity_usage: "電気月間使用量（kWh）"
+        , monthly_electricity_bill: "月の電気代（円）"
+        , annual_electricity_usage: "電気年間使用量（kWh）"
+        , annual_electricity_bill: "年間電気代（円）"
+        , power_saving_awareness: "節電意識"
+        , set_discount: "セット割"
+        , power_company_change: "電力会社の変更"
+        , house_energy_info_update_date: "家屋・エネルギー情報更新日"
+    },
+    tags: ["l1", "D0222", "l1_D0222"],
+    uniqueKey: ["customer_code"],
+    assertions: {
+        nonNull: ["customer_code"],
+        uniqueKey: ["customer_code"],
+    },
+}
+
+SELECT DISTINCT
+    RTRIM(customer_code) AS customer_code
+    ,RTRIM(target_property) AS target_property
+    ,RTRIM(house_structure) AS house_structure
+    ,RTRIM(house_floors) AS house_floors
+    ,CAST(RTRIM(completion_year) as INT64) AS completion_year
+    ,CAST(RTRIM(completion_month) as INT64) AS completion_month
+    ,CAST(RTRIM(house_size_tsubo) as INT64) AS house_size_tsubo
+    ,CAST(RTRIM(house_size_rooms) as INT64) AS house_size_rooms
+    ,RTRIM(house_condition_overall) AS house_condition_overall
+    ,RTRIM(house_condition_roof) AS house_condition_roof
+    ,RTRIM(house_condition_exterior) AS house_condition_exterior
+    ,RTRIM(roof) AS roof
+    ,RTRIM(roof_direction) AS roof_direction
+    ,RTRIM(roof_material) AS roof_material
+    ,RTRIM(renovation_history_flag) AS renovation_history_flag
+    ,RTRIM(renovation_history_year) AS renovation_history_year
+    ,RTRIM(renovation_plan_flag) AS renovation_plan_flag
+    ,RTRIM(renovation_plan_year) AS renovation_plan_year
+    ,RTRIM(renovation_plan_month) AS renovation_plan_month
+    ,RTRIM(rebuild_plan_flag) AS rebuild_plan_flag
+    ,RTRIM(rebuild_plan_year) AS rebuild_plan_year
+    ,RTRIM(rebuild_plan_month) AS rebuild_plan_month
+    ,RTRIM(energy_usage) AS energy_usage
+    ,CAST(RTRIM(gas_usage_m3_year)  AS INT64) AS gas_usage_m3_year
+    ,CAST(RTRIM(gas_usage_yen_year) AS INT64) AS gas_usage_yen_year
+    ,RTRIM(power_supply) AS power_supply
+    ,RTRIM(solar_usage_flag) AS solar_usage_flag
+    ,RTRIM(kitchen) AS kitchen
+    ,RTRIM(hot_water_equipment_gas) AS hot_water_equipment_gas
+    ,RTRIM(hot_water_equipment_oil) AS hot_water_equipment_oil
+    ,RTRIM(hot_water_equipment_eco_cute) AS hot_water_equipment_eco_cute
+    ,RTRIM(hot_water_equipment_electric) AS hot_water_equipment_electric
+    ,RTRIM(hot_water_equipment_other) AS hot_water_equipment_other
+    ,RTRIM(heating_equipment) AS heating_equipment
+    ,RTRIM(floor_heating) AS floor_heating
+    ,RTRIM(bathroom_heating) AS bathroom_heating
+    ,CAST(RTRIM(contract_ampere) AS INT64) AS contract_ampere
+    ,RTRIM(contract_company) AS contract_company
+    ,CAST(RTRIM(power_meter_reading) AS FLOAT64) AS power_meter_reading
+    ,RTRIM(power_meter_inspection_year_month) AS power_meter_inspection_year_month
+    ,RTRIM(power_meter_inspection_year) AS power_meter_inspection_year
+    ,RTRIM(electricity_usage_target_month) AS electricity_usage_target_month
+    ,CAST(RTRIM(monthly_electricity_usage)AS INT64) AS monthly_electricity_usage
+    ,CAST(RTRIM(monthly_electricity_bill) AS INT64) AS monthly_electricity_bill
+    ,CAST(RTRIM(annual_electricity_usage) AS INT64) AS annual_electricity_usage
+    ,CAST(RTRIM(annual_electricity_bill)  AS INT64) AS annual_electricity_bill
+    ,RTRIM(power_saving_awareness) AS power_saving_awareness
+    ,RTRIM(set_discount) AS set_discount
+    ,RTRIM(power_company_change) AS power_company_change
+    ,PARSE_DATE("%Y/%m/%d",RTRIM(house_energy_info_update_date)) AS house_energy_info_update_date
+    
+FROM ${ref('l0_D0222_tanpopo_house_energy')}
+WHERE 0=0
+    ${when(incremental(),
+    `AND _PARTITIONTIME = (SELECT MAX(_PARTITIONTIME) FROM ${ref('l0_D0222_tanpopo_house_energy')})`
+    )}
+QUALIFY ROW_NUMBER()OVER(PARTITION BY customer_code ORDER BY house_energy_info_update_date DESC)=1

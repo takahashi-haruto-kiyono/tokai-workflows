@@ -1,0 +1,37 @@
+config {
+    type: "incremental",
+    schema: "l1_cdp_staging",
+    description: "価格履歴",
+    columns: {
+        customer_code: "需用家コード"
+        , price_category: "価格区分"
+        , price: "価格"
+        , purpose_specific: "用途別"
+        , additional_charge_total: "加算料金計"
+        , change_date: "変更日"
+    },
+    tags: ["l1", "D020", "l1_D020"],
+    uniqueKey: ["customer_code", "price_category","change_date"],
+    bigquery: {
+        partitionBy: 'DATE_TRUNC(change_date, MONTH)'
+    },
+    assertions: {
+        nonNull: ["customer_code", "price_category","change_date"],
+        uniqueKey: ["customer_code", "price_category","change_date"],
+    },
+}
+
+SELECT DISTINCT
+    RTRIM(customer_code) AS customer_code
+    ,RTRIM(price_category) AS price_category
+    ,RTRIM(price) AS price
+    ,RTRIM(purpose_specific) AS purpose_specific
+    ,RTRIM(additional_charge_total) AS additional_charge_total
+    ,PARSE_DATE("%Y/%m/%d",RTRIM(change_date)) AS change_date
+FROM ${ref('l0_D020_tanpopo_price_history')}
+WHERE 0=0
+    ${when(incremental(),
+    `AND _PARTITIONDATE = (SELECT MAX(_PARTITIONTIME) FROM ${ref('l0_D020_tanpopo_price_history')})`
+    )}
+    --単純積み上げだからいらない？
+QUALIFY ROW_NUMBER()OVER(PARTITION BY customer_code, price_category ORDER BY _PARTITIONDATE DESC, change_date DESC)=1

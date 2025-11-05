@@ -1,0 +1,78 @@
+config {
+    type: "incremental",
+    schema: "l1_cdp_staging",
+    description: "",
+      bigquery: {
+        partitionBy: 'DATE_TRUNC(date_field, MONTH)'
+      },
+    columns: {
+        date_field: "",
+        customer_code: "",
+        location_no: "",
+        reading_00h: "",
+        reading_01h: "",
+        reading_02h: "",
+        reading_03h: "",
+        reading_04h: "",
+        reading_05h: "",
+        reading_06h: "",
+        reading_07h: "",
+        reading_08h: "",
+        reading_09h: "",
+        reading_10h: "",
+        reading_11h: "",
+        reading_12h: "",
+        reading_13h: "",
+        reading_14h: "",
+        reading_15h: "",
+        reading_16h: "",
+        reading_17h: "",
+        reading_18h: "",
+        reading_19h: "",
+        reading_20h: "",
+        reading_21h: "",
+        reading_22h: "",
+        reading_23h: ""
+    },
+    uniqueKey: ['customer_code','date_field'],
+    tags: ["l1", "D999", "l1_D999"],
+    assertions: {
+        nonNull: ['customer_code','date_field'],
+        uniqueKey: ['customer_code','date_field']
+    }
+}
+SELECT 
+  PARSE_DATE("%Y-%m-%d",TRIM(date_field)) as date_field,
+  TRIM(customer_code) as customer_code,
+  TRIM(location_no) as location_no,
+  TRIM(reading_00h) as reading_00h,
+  TRIM(reading_01h) as reading_01h,
+  TRIM(reading_02h) as reading_02h,
+  TRIM(reading_03h) as reading_03h,
+  TRIM(reading_04h) as reading_04h,
+  TRIM(reading_05h) as reading_05h,
+  TRIM(reading_06h) as reading_06h,
+  TRIM(reading_07h) as reading_07h,
+  TRIM(reading_08h) as reading_08h,
+  TRIM(reading_09h) as reading_09h,
+  TRIM(reading_10h) as reading_10h,
+  TRIM(reading_11h) as reading_11h,
+  TRIM(reading_12h) as reading_12h,
+  TRIM(reading_13h) as reading_13h,
+  TRIM(reading_14h) as reading_14h,
+  TRIM(reading_15h) as reading_15h,
+  TRIM(reading_16h) as reading_16h,
+  TRIM(reading_17h) as reading_17h,
+  TRIM(reading_18h) as reading_18h,
+  TRIM(reading_19h) as reading_19h,
+  TRIM(reading_20h) as reading_20h,
+  TRIM(reading_21h) as reading_21h,
+  TRIM(reading_22h) as reading_22h,
+  TRIM(reading_23h) as reading_23h,
+FROM 
+    ${ref('l0_D999_lpwa_data')}
+WHERE 0=0
+    ${when(incremental(),
+    `AND _PARTITIONTIME = (SELECT MAX(_PARTITIONTIME) FROM ${ref('l0_D999_lpwa_data')})`
+    )}
+QUALIFY ROW_NUMBER()OVER(PARTITION BY date_field,customer_code, location_no ORDER BY _PARTITIONTIME DESC)=1

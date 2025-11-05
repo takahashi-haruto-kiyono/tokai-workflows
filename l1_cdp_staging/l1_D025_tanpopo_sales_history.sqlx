@@ -1,0 +1,57 @@
+config {
+    type: "incremental",
+    schema: "l1_cdp_staging",
+    description: "営業履歴",
+    columns: {
+        customer_code: "需用家コード"
+        , business_talk_date: "商談日"
+        , business_talk_number: "商談No."
+        , product: "商品"
+        , prospect: "見込み"
+        , quantity: "数量"
+        , sales_contract_scheduled_month: "売上・成約予定月"
+        , sales_amount_thousand_yen: "売上高（千円）"
+        , sales_profit_thousand_yen: "売上利益（千円）"
+        , staff_employee_code: "担当者従業員コード"
+        , completed: "完了"
+        , update_date: "更新日"
+    },
+    tags: ["l1", "D025", "l1_D025"],
+    uniqueKey: ["customer_code","business_talk_date","business_talk_number"],
+    bigquery: {
+        partitionBy: 'DATE_TRUNC(business_talk_date, MONTH)'
+    },
+    assertions: {
+        nonNull: ["customer_code","business_talk_number"],
+        uniqueKey: ["customer_code","business_talk_number", "business_talk_date"],
+    },
+}
+
+SELECT
+    RTRIM(customer_code) AS customer_code
+
+    -- 3行のみ商談日がNULLのデータが存在したため更新日で代用する
+    ,COALESCE(
+        SAFE.PARSE_DATE("%Y/%m/%d",RTRIM(business_talk_date))
+        , CAST(SAFE.PARSE_DATETIME("%Y/%m/%d %H:%M:%S",RTRIM(update_date)) AS DATE)
+     ) AS business_talk_date
+    ,RTRIM(business_talk_number) AS business_talk_number
+    ,RTRIM(product) AS product
+    ,RTRIM(prospect) AS prospect
+    ,SAFE_CAST(RTRIM(quantity) as INT64) AS quantity -- 要確認
+    ,RTRIM(sales_contract_scheduled_month) AS sales_contract_scheduled_month --要確認（月始を指定）
+    ,SAFE_CAST(RTRIM(sales_amount_thousand_yen) AS INT64) AS sales_amount_thousand_yen
+    ,SAFE_CAST(RTRIM(sales_profit_thousand_yen) AS INT64) AS sales_profit_thousand_yen
+    ,RTRIM(staff_employee_code) AS staff_employee_code
+    ,RTRIM(completed) AS completed
+    ,SAFE.PARSE_DATETIME("%Y/%m/%d %H:%M:%S",RTRIM(update_date)) AS update_date -- dt?date?
+FROM ${ref('l0_D025_tanpopo_sales_history')}
+WHERE 0=0
+    ${when(incremental(),
+    `AND _PARTITIONDATE = (SELECT MAX(_PARTITIONTIME) FROM ${ref('l0_D025_tanpopo_sales_history')})`
+    )}
+-- 最新の更新のみを取得
+QUALIFY ROW_NUMBER() OVER(
+    PARTITION BY customer_code, business_talk_date, business_talk_number
+    ORDER BY update_date DESC
+) = 1

@@ -1,0 +1,46 @@
+config {
+    type: "incremental",
+    schema: "l1_cdp_staging",
+    description: "イベント予約",
+    columns: {
+        customer_code: "需用家コード"
+        , event_name: "イベント名"
+        , reservation_venue: "予約会場"
+        , reservation_date: "予約日"
+        , reservation_time: "予約時間"
+        , reservation_people_count: "予約人数"
+        , registration_date: "登録日"
+        , update_date: "更新日"
+        , cancel_datetime: "キャンセル日時"
+    },
+    tags: ["l1", "D023", "l1_D023"],
+    uniqueKey: ["customer_code","event_name","reservation_venue","reservation_date","reservation_time"],
+    bigquery: {
+        partitionBy: 'reservation_date'
+    },
+    assertions: {
+        nonNull: ["customer_code","event_name","reservation_venue","reservation_date","reservation_time"],
+        uniqueKey: ["customer_code","event_name","reservation_venue","reservation_date","reservation_time"],
+    },
+}
+
+SELECT DISTINCT
+    RTRIM(customer_code) AS customer_code
+    ,RTRIM(event_name) AS event_name
+    ,RTRIM(reservation_venue) AS reservation_venue
+    ,PARSE_DATE("%Y/%m/%d",RTRIM(reservation_date)) AS reservation_date
+    ,RTRIM(reservation_time) AS reservation_time
+    ,RTRIM(reservation_people_count) AS reservation_people_count
+    ,PARSE_DATETIME("%Y/%m/%d %H:%M:%S",RTRIM(registration_date)) AS registration_date
+    ,PARSE_DATETIME("%Y/%m/%d %H:%M:%S",RTRIM(update_date)) AS update_date
+    ,SAFE.PARSE_DATETIME("%Y/%m/%d %H:%M:%S",RTRIM(cancel_datetime)) AS cancel_datetime
+FROM ${ref('l0_D023_tanpopo_event_reservation')}
+WHERE 0=0
+    ${when(incremental(),
+    `AND _PARTITIONDATE = (SELECT MAX(_PARTITIONTIME) FROM ${ref('l0_D023_tanpopo_event_reservation')})`
+    )}
+-- 最新の更新のみを取得
+QUALIFY ROW_NUMBER() OVER(
+    PARTITION BY customer_code, event_name, reservation_venue, reservation_date, reservation_time
+    ORDER BY update_date DESC
+) = 1

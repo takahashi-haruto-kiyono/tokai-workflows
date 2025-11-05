@@ -1,0 +1,38 @@
+config {
+    type: "incremental",
+    schema: "l1_cdp_staging",
+    description: "滞留需用家履歴Ｖ",
+    columns: {
+        customer_code: "需用家コード"
+        , judgment_year_month: "判断年月"
+        , management_type: "管理区分"
+        , collection_management_card_issuance_target_flag: "回収管理カード発行対象フラグ"
+        , last_updater_id: "最終更新者ＩＤ"
+        , registration_date: "登録日"
+        , last_update_date: "最終更新日"
+    },
+    tags: ["l1", "D015", "l1_D015"],
+    uniqueKey: ["customer_code", "judgment_year_month"],
+    assertions: {
+        nonNull: ["customer_code", "judgment_year_month"],
+        uniqueKey: ["customer_code", "judgment_year_month"],
+    },
+      bigquery: {
+        partitionBy: 'judgment_year_month'
+      },
+}
+SELECT
+    RTRIM(customer_code) AS customer_code
+    , PARSE_DATE("%Y%m", RTRIM(judgment_year_month)) AS judgment_year_month
+    , RTRIM(management_type) AS management_type
+    , RTRIM(collection_management_card_issuance_target_flag) AS collection_management_card_issuance_target_flag
+    , RTRIM(last_updater_id) AS last_updater_id
+    , PARSE_DATETIME("%Y/%m/%d %H:%M:%S",RTRIM(registration_date)) AS registration_date
+    , PARSE_DATETIME("%Y/%m/%d %H:%M:%S",RTRIM(last_update_date)) AS last_update_date
+FROM ${ref('l0_D015_customer_history')}
+WHERE 0=0
+-- 差分更新では直近2日のデータで更新する。レコードの削除は発生しない想定
+    ${when(incremental(),
+    `AND _PARTITIONTIME >= (SELECT MAX(_PARTITIONTIME) FROM ${ref('l0_D015_customer_history')})`
+    )}
+QUALIFY ROW_NUMBER()OVER(PARTITION BY customer_code ORDER BY _PARTITIONDATE DESC)=1

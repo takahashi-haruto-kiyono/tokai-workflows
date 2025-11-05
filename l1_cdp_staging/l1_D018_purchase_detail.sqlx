@@ -1,0 +1,44 @@
+config {
+    type: "incremental",
+    schema: "l1_cdp_staging",
+    description: "購入詳細",
+    columns: {
+        customer_code: "需用家コード"
+        , purchase_date: "購入日"
+        , equipment_name: "購入機器名"
+        , manufacturer: "メーカー"
+        , part_number: "品番"
+        , age: "経年"
+        , sales_type: "販売区分"
+        , quantity: "数量"
+        , sales_amount: "販売金額"
+        , update_date: "更新日"
+    },
+    tags: ["l1", "D018", "l1_D018"],
+    uniqueKey: ["customer_code", "purchase_date", "equipment_name"],
+      bigquery: {
+        partitionBy: 'DATE_TRUNC(purchase_date, MONTH)'
+      },
+    assertions: {
+        nonNull: ['customer_code', "purchase_date", "equipment_name"],
+        uniqueKey: ['customer_code', "purchase_date", "equipment_name"],
+    },
+}
+-- CSV読み取り時にエラーが出てるので今後要注意 2025年10月24日
+SELECT
+    RTRIM(customer_code) AS customer_code
+    ,PARSE_DATE("%Y/%m/%d",RTRIM(purchase_date)) AS purchase_date
+    ,RTRIM(equipment_name) AS equipment_name
+    ,RTRIM(manufacturer) AS manufacturer
+    ,RTRIM(part_number) AS part_number
+    ,CAST(RTRIM(age) as FLOAT64) AS age
+    ,RTRIM(sales_type) AS sales_type
+    ,CAST(RTRIM(quantity) as FLOAT64) AS quantity
+    ,CAST(RTRIM(sales_amount) as INT64) AS sales_amount
+    ,PARSE_DATE("%Y/%m/%d",RTRIM(update_date)) AS update_date
+FROM ${ref('l0_D018_purchase_detail')}
+WHERE 0=0
+    ${when(incremental(),
+    `AND _PARTITIONDATE = (SELECT MAX(_PARTITIONTIME) FROM ${ref('l0_D018_purchase_detail')})`
+    )}
+QUALIFY ROW_NUMBER()OVER(PARTITION BY customer_code ORDER BY _PARTITIONDATE DESC)=1

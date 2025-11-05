@@ -1,0 +1,47 @@
+config {
+    type: "table",
+    schema: "l1_cdp_staging",
+    description: "Tanpopo所有器具メンテナンス",
+    columns: {
+        customer_code: "需用家コード"
+        , equipment_category: "器具分類"
+        , equipment_name: "器具名称"
+        , equipment_function: "器具機能"
+        , manufacturer: "メーカー"
+        , manufacturer_free_text: "メーカー（自由記入）"
+        , model: "型式"
+        , consumption_kw: "消費KW"
+        , quantity: "台数"
+        , manufacture_date: "製造年月"
+        , purchase_date: "購入年月"
+        , ventilation: "給排気"
+        , condition: "状態"
+        , status: "ステータス"
+        , update_date: "更新日"
+    },
+    tags: ["l1", "D017", "l1_D017"],
+    assertions: {
+        nonNull: ["customer_code"],
+        uniqueKey: ["customer_code"],
+    },
+}
+SELECT
+    RTRIM(customer_code) AS customer_code
+    , RTRIM(equipment_category) AS equipment_category
+    , RTRIM(equipment_name) AS equipment_name
+    , RTRIM(equipment_function) AS equipment_function
+    , RTRIM(manufacturer) AS manufacturer
+    , RTRIM(manufacturer_free_text) AS manufacturer_free_text
+    , RTRIM(model) AS model
+    , SAFE_CAST(RTRIM(consumption_kw) as FLOAT64) AS consumption_kw
+    , SAFE_CAST(RTRIM(quantity) AS INT64) AS quantity
+    , SAFE.PARSE_DATE('%Y%m',RTRIM(manufacture_date)) AS manufacture_date
+    , SAFE.PARSE_DATE('%Y%m',RTRIM(purchase_date)) AS purchase_date
+    , RTRIM(ventilation) AS ventilation
+    , RTRIM(condition) AS condition
+    , RTRIM(status) AS status
+    , PARSE_DATETIME("%Y/%m/%d %H:%M:%S",RTRIM(update_date)) AS update_date
+FROM ${ref('l0_D017_Equipment_Maintenance')}
+WHERE 0=0
+    AND _PARTITIONTIME = (SELECT MAX(_PARTITIONTIME) FROM ${ref('l0_D017_Equipment_Maintenance')})
+QUALIFY ROW_NUMBER()OVER(PARTITION BY customer_code ORDER BY update_date DESC) = 1
